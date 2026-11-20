@@ -1,6 +1,6 @@
 import asyncio
 import os
-import google.generativeai as genai
+from openai import AsyncOpenAI
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
     Message, CallbackQuery,
@@ -13,12 +13,11 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+DEEPSEEK_API_KEY = os.environ["DEEPSEEK_API_KEY"]
 
-genai.configure(api_key=GEMINI_API_KEY)
-gemini = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    system_instruction=None
+client = AsyncOpenAI(
+    api_key=DEEPSEEK_API_KEY,
+    base_url="https://api.deepseek.com"
 )
 
 bot = Bot(token=BOT_TOKEN)
@@ -94,11 +93,16 @@ class Gen(StatesGroup):
 # ── GPT-запрос ───────────────────────────────────────────────────────────────
 
 async def ask_gpt(prompt: str) -> str:
-    full_prompt = SYSTEM_PROMPT + "\n\n" + prompt
-    response = await asyncio.get_event_loop().run_in_executor(
-        None, lambda: gemini.generate_content(full_prompt)
+    response = await client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.85,
+        max_tokens=1200,
     )
-    return response.text.strip()
+    return response.choices[0].message.content.strip()
 
 # ── Хэндлеры ─────────────────────────────────────────────────────────────────
 
