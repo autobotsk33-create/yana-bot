@@ -1,6 +1,6 @@
 import asyncio
 import os
-from groq import AsyncGroq
+import google.generativeai as genai
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
     Message, CallbackQuery,
@@ -13,11 +13,16 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+
+genai.configure(api_key=GEMINI_API_KEY)
+gemini = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    system_instruction=None
+)
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
-client = AsyncGroq(api_key=GROQ_API_KEY)
 
 SYSTEM_PROMPT = """Ты — контент-помощник мастера перманентного макияжа Яны Романенко.
 Твоя задача — генерировать тексты для постов и сторис в стиле Яны.
@@ -89,16 +94,11 @@ class Gen(StatesGroup):
 # ── GPT-запрос ───────────────────────────────────────────────────────────────
 
 async def ask_gpt(prompt: str) -> str:
-    response = await client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.85,
-        max_tokens=1200,
+    full_prompt = SYSTEM_PROMPT + "\n\n" + prompt
+    response = await asyncio.get_event_loop().run_in_executor(
+        None, lambda: gemini.generate_content(full_prompt)
     )
-    return response.choices[0].message.content.strip()
+    return response.text.strip()
 
 # ── Хэндлеры ─────────────────────────────────────────────────────────────────
 
